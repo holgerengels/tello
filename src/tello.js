@@ -1,5 +1,5 @@
 const dgram = require('dgram');
-const settings = require('./config/settings.json');
+const settings = require('../config/settings.json');
 
 class Tello {
     constructor() {

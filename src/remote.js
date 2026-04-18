@@ -1,5 +1,5 @@
 const Tello = require('./tello');
-const settings = require('./config/settings.json');
+const settings = require('../config/settings.json');
 const readline = require('readline');
 
 async function run() {
