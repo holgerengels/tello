@@ -1,5 +1,5 @@
 const dgram = require('dgram');
-const settings = require('../config/settings.json');
+const settings = require('./config/settings.json');
 
 class Tello {
     constructor() {
@@ -7,13 +7,13 @@ class Tello {
         this.PORT = settings.port || 8889;
         this.client = dgram.createSocket('udp4');
         this.pendingCommand = null;
-        
+
         this.client.bind(this.PORT);
 
         this.client.on('message', (msg, info) => {
             const response = msg.toString().trim();
             console.log(`[Tello]: ${response}`);
-            
+
             // Wenn wir auf eine Antwort warten, lösen wir das Promise auf
             if (this.pendingCommand) {
                 this.pendingCommand.resolve(response);
@@ -33,7 +33,7 @@ class Tello {
     send(command) {
         return new Promise((resolve, reject) => {
             const message = Buffer.from(command);
-            
+
             // Setze den pendingCommand auf, um auf die Antwort auf Port 8889 zu warten
             this.pendingCommand = {
                 resolve: resolve,
