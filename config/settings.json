@@ -1,4 +1,15 @@
 {
 	"ip": "192.168.10.1",
-	"port": 8889
+	"port": 8889,
+	"keys": {
+		"up": "forward 20",
+		"down": "back 20",
+		"left": "ccw 15",
+		"right": "cw 15",
+		"pageup": "up 20",
+		"pagedown": "down 20",
+		"t": "takeoff",
+		"l": "land",
+		"space": "stop"
+	}
 }
