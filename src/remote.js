@@ -26,26 +26,38 @@ async function run() {
         }
 
         let rcState = { a: 0, b: 0, c: 0, d: 0 };
-        const speed = 50; // Geschwindigkeit der Bewegung (10 bis 100)
+        const speed = 50; // Feste Geschwindigkeit anstelle von Inkrementen
 
-        // rc command lookup (action -> axis and velocity change)
+        // rc command lookup (action -> axis and direction)
         const rcActionMap = {
-            'forward': { axis: 'b', val: speed },
-            'back': { axis: 'b', val: -speed },
-            'left': { axis: 'a', val: -speed }, // seitwärts links
-            'right': { axis: 'a', val: speed }, // seitwärts rechts
-            'up': { axis: 'c', val: speed },
-            'down': { axis: 'c', val: -speed },
-            'ccw': { axis: 'd', val: -speed }, // drehen links herum
-            'cw': { axis: 'd', val: speed }    // drehen rechts herum
+            'forward': { axis: 'b', dir: 1 },
+            'back': { axis: 'b', dir: -1 },
+            'left': { axis: 'a', dir: -1 }, // seitwärts links
+            'right': { axis: 'a', dir: 1 }, // seitwärts rechts
+            'up': { axis: 'c', dir: 1 },
+            'down': { axis: 'c', dir: -1 },
+            'ccw': { axis: 'd', dir: -1 }, // drehen links herum
+            'cw': { axis: 'd', dir: 1 }    // drehen rechts herum
         };
 
         let rcInterval = null;
+        let keyTimeout = null;
+        let lastAction = null;
 
         const sendRcCommand = () => {
             // rc a b c d
             // a: links/rechts, b: vor/zurück, c: hoch/runter, d: yaw (drehung)
             drone.send(`rc ${rcState.a} ${rcState.b} ${rcState.c} ${rcState.d}`).catch(() => {});
+        };
+
+        const stopRc = () => {
+            rcState = { a: 0, b: 0, c: 0, d: 0 };
+            sendRcCommand();
+            if (rcInterval) {
+                clearInterval(rcInterval);
+                rcInterval = null;
+            }
+            lastAction = null;
         };
 
         process.stdin.on('keypress', async (str, key) => {
@@ -60,15 +72,10 @@ async function run() {
             if (!command) return;
 
             if (command === 'stop') {
-                // Alle RC werte auf 0 zurücksetzen und anhalten
-                rcState = { a: 0, b: 0, c: 0, d: 0 };
-                if (rcInterval) {
-                    clearInterval(rcInterval);
-                    rcInterval = null;
-                }
+                if (keyTimeout) clearTimeout(keyTimeout);
+                stopRc();
                 
                 // Explizit den Hover-Befehl senden, um sofort anzuhalten
-                drone.send('rc 0 0 0 0').catch(()=>{}); 
                 drone.send('stop').catch(()=>{}); 
                 console.log('\n[STOP] Drohne schwebt auf der Stelle.');
                 
@@ -77,14 +84,33 @@ async function run() {
                 const rcDef = rcActionMap[action];
                 
                 if (rcDef) {
-                    // Werte updaten
-                    rcState[rcDef.axis] = rcDef.val;
-                    console.log(`[RC Update] Axis '${rcDef.axis}' = ${rcDef.val} (a:${rcState.a} b:${rcState.b} c:${rcState.c} d:${rcState.d})`);
+                    // Reset all axes to prevent diagonal drift when only rotating
+                    rcState = { a: 0, b: 0, c: 0, d: 0 };
+                    
+                    // Setze den Wert auf die feste Geschwindigkeit
+                    rcState[rcDef.axis] = rcDef.dir * speed;
+
+                    if (action !== lastAction) {
+                        console.log(`[RC Update] ${action} (Achse '${rcDef.axis}' = ${rcState[rcDef.axis]})`);
+                        lastAction = action;
+                    }
+                    
+                    // Timeout zurücksetzen
+                    if (keyTimeout) clearTimeout(keyTimeout);
+                    
+                    // Nach 600ms ohne neuen Tastendruck die Drohne anhalten
+                    // (Überbrückt die Auto-Repeat-Pause des Betriebssystems)
+                    keyTimeout = setTimeout(() => {
+                        stopRc();
+                        console.log(`[Auto-Stop] Taste losgelassen. Drohne schwebt.`);
+                    }, 600);
+                    
+                    // Befehl sofort senden für verzögerungsfreie Reaktion
+                    sendRcCommand();
                     
                     // Sende Tello den neuen Status kontinuierlich, da der SDK Modus oft laufende Updates für RC erwartet
                     if (!rcInterval) {
-                        sendRcCommand();
-                        rcInterval = setInterval(sendRcCommand, 200); // alle 200ms senden
+                        rcInterval = setInterval(sendRcCommand, 50); // alle 50ms senden für direktere Steuerung
                     }
                 }
             } else {

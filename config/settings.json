@@ -12,6 +12,7 @@
 		"pagedown": "rc:down",
 		"t": "takeoff",
 		"l": "land",
-		"space": "stop"
+		"space": "stop",
+		"b": "battery?"
 	}
 }

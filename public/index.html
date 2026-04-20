@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tello Web Control</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-weight: 800;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            align-items: center;
+        }
+
+        .indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--danger);
+            display: inline-block;
+        }
+
+        .indicator.connected {
+            background-color: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1000px;
+            align-items: stretch;
+            flex-wrap: wrap;
+        }
+
+        .video-container {
+            flex: 1;
+            min-width: 300px;
+            background-color: var(--surface);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+            min-height: 400px;
+        }
+
+        .video-placeholder {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .controls-container {
+            width: 300px;
+            background-color: var(--surface);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5);
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.danger {
+            background-color: var(--danger);
+            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.5);
+        }
+
+        .btn.danger:hover {
+            background-color: var(--danger-hover);
+        }
+
+        .key-hints {
+            margin-top: auto;
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .key-hints ul {
+            list-style: none;
+            margin-top: 0.5rem;
+        }
+
+        .key-hints li {
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        kbd {
+            background-color: #334155;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            color: var(--text);
+            font-family: monospace;
+            border-bottom: 2px solid #1e293b;
+            transition: all 0.1s;
+        }
+
+        .key-active {
+            background-color: var(--primary);
+            color: white;
+            border-bottom-color: var(--primary-hover);
+            transform: translateY(2px);
+        }
+
+        #battery-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        #battery-overlay.show {
+            opacity: 1;
+        }
+
+        .battery-icon {
+            width: 120px;
+            height: 60px;
+            border: 4px solid var(--text);
+            border-radius: 10px;
+            position: relative;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+
+        .battery-icon::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: -12px;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 20px;
+            background-color: var(--text);
+            border-radius: 0 4px 4px 0;
+        }
+
+        #battery-level-bar {
+            height: 100%;
+            background-color: #22c55e;
+            border-radius: 4px;
+            width: 100%;
+            transition: width 0.5s ease, background-color 0.5s ease;
+        }
+
+        #battery-text {
+            font-size: 4rem;
+            font-weight: 800;
+            color: var(--text);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="status-bar">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div id="connection-indicator" class="indicator"></div>
+            <span id="connection-text">Verbinde zum Server...</span>
+        </div>
+        <div>
+            RC Status: <span id="rc-status"
+                style="font-family: monospace; background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 0.25rem;">a:0
+                b:0 c:0 d:0</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="video-container">
+            <canvas id="video-canvas" width="960" height="720" style="width: 100%; height: 100%; object-fit: contain; background: #000;"></canvas>
+        </div>
+
+        <div class="controls-container">
+            <h3>Steuerung</h3>
+            <button class="btn" id="btn-takeoff">Start (Takeoff)</button>
+            <button class="btn" id="btn-land">Landen</button>
+            <button class="btn danger" id="btn-stop">Nothalt (Stop)</button>
+
+            <div class="key-hints" id="key-hints-container" style="display: none;">
+                <strong>Tastatur:</strong>
+                <ul id="dynamic-key-hints">
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="battery-overlay">
+        <div class="battery-icon">
+            <div id="battery-level-bar"></div>
+        </div>
+        <div id="battery-text">--%</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/jsmpeg.min.js"></script>
+    <script>
+        const socket = io();
+
+        // JSMpeg Player initialisieren
+        const canvas = document.getElementById('video-canvas');
+        const wsUrl = `ws://${window.location.hostname}:3001/`;
+        const player = new JSMpeg.Player(wsUrl, {
+            canvas: canvas,
+            audio: false,
+            videoBufferSize: 512 * 1024,
+            preserveDrawingBuffer: true
+        });
+
+        const indicator = document.getElementById('connection-indicator');
+        const connText = document.getElementById('connection-text');
+        const rcStatus = document.getElementById('rc-status');
+
+        socket.on('connect', () => {
+            indicator.classList.add('connected');
+            connText.textContent = 'Server verbunden';
+        });
+
+        socket.on('disconnect', () => {
+            indicator.classList.remove('connected');
+            connText.textContent = 'Verbindung getrennt';
+        });
+
+        socket.on('battery_status', (level) => {
+            const levelNum = parseInt(level, 10);
+            if (!isNaN(levelNum)) {
+                const bar = document.getElementById('battery-level-bar');
+                const text = document.getElementById('battery-text');
+                const overlay = document.getElementById('battery-overlay');
+                
+                bar.style.width = `${levelNum}%`;
+                text.textContent = `${levelNum}%`;
+                
+                if (levelNum > 50) bar.style.backgroundColor = '#22c55e';
+                else if (levelNum > 20) bar.style.backgroundColor = '#eab308';
+                else bar.style.backgroundColor = '#ef4444';
+                
+                overlay.classList.add('show');
+                
+                if (window.batteryTimeout) clearTimeout(window.batteryTimeout);
+                window.batteryTimeout = setTimeout(() => {
+                    overlay.classList.remove('show');
+                }, 3000);
+            }
+        });
+
+        // RC Zustand (a, b, c, d)
+        let rc = { a: 0, b: 0, c: 0, d: 0 };
+        const speed = 50;
+
+        // Tasten mapping (Key -> Achse und Richtung)
+        let keyMap = {};
+        let commandMap = {};
+
+        // Settings laden
+        fetch('/api/settings')
+            .then(res => res.json())
+            .then(settings => {
+                if (settings.keys) {
+                    const rcActionMap = {
+                        'rc:forward': { axis: 'b', dir: 1 },
+                        'rc:back': { axis: 'b', dir: -1 },
+                        'rc:left': { axis: 'a', dir: -1 },
+                        'rc:right': { axis: 'a', dir: 1 },
+                        'rc:up': { axis: 'c', dir: 1 },
+                        'rc:down': { axis: 'c', dir: -1 },
+                        'rc:cw': { axis: 'd', dir: 1 },
+                        'rc:ccw': { axis: 'd', dir: -1 }
+                    };
+
+                    const reverseKeyMap = {};
+
+                    for (const [keyName, action] of Object.entries(settings.keys)) {
+                        if (action.startsWith('rc:')) {
+                            if (rcActionMap[action]) {
+                                keyMap[keyName] = rcActionMap[action];
+                            }
+                        } else {
+                            commandMap[keyName] = action; // 'takeoff', 'land', 'stop'
+                        }
+                        reverseKeyMap[action] = keyName;
+                    }
+
+                    // UI generieren
+                    const ul = document.getElementById('dynamic-key-hints');
+                    const addRow = (label, action1, action2) => {
+                        const k1 = reverseKeyMap[action1];
+                        const k2 = reverseKeyMap[action2];
+                        if (k1 && k2) {
+                            ul.innerHTML += `<li><span>${label}</span> <div><kbd id="key-${k1}">${formatKey(k1)}</kbd> <kbd id="key-${k2}">${formatKey(k2)}</kbd></div></li>`;
+                        }
+                    };
+
+                    const addSingleRow = (label, action, isMargin) => {
+                        const k = reverseKeyMap[action];
+                        if (k) {
+                            const margin = isMargin ? 'style="margin-top: 10px"' : '';
+                            ul.innerHTML += `<li ${margin}><span>${label}</span> <kbd id="key-${k}">${formatKey(k)}</kbd></li>`;
+                        }
+                    };
+
+                    addRow('Vor / Zurück', 'rc:forward', 'rc:back');
+                    addRow('Links / Rechts', 'rc:left', 'rc:right');
+                    addRow('Hoch / Runter', 'rc:up', 'rc:down');
+                    addRow('Drehen', 'rc:ccw', 'rc:cw');
+
+                    addSingleRow('Start', 'takeoff', true);
+                    addSingleRow('Landen', 'land', false);
+                    addSingleRow('Sofort Stop', 'stop', false);
+                    addSingleRow('Batterie', 'battery?', false);
+
+                    document.getElementById('key-hints-container').style.display = 'block';
+                }
+            })
+            .catch(err => console.error('Fehler beim Laden der Settings:', err));
+
+        function formatKey(k) {
+            if (k === 'up') return '↑';
+            if (k === 'down') return '↓';
+            if (k === 'left') return '←';
+            if (k === 'right') return '→';
+            if (k === 'space') return 'Leertaste';
+            if (k === 'pageup') return 'Bild↑';
+            if (k === 'pagedown') return 'Bild↓';
+            return k.toUpperCase();
+        }
+
+        function normalizeKey(e) {
+            let k = e.key.toLowerCase();
+            if (k === ' ') return 'space';
+            if (k === 'arrowup') return 'up';
+            if (k === 'arrowdown') return 'down';
+            if (k === 'arrowleft') return 'left';
+            if (k === 'arrowright') return 'right';
+            return k;
+        }
+
+        const activeKeys = new Set();
+
+        function updateRC() {
+            // Reset RC
+            rc = { a: 0, b: 0, c: 0, d: 0 };
+
+            // Berechne neu basierend auf aktiven Tasten
+            for (const key of activeKeys) {
+                const mapping = keyMap[key];
+                if (mapping) {
+                    rc[mapping.axis] = mapping.dir * speed;
+                }
+            }
+
+            rcStatus.textContent = `a:${rc.a} b:${rc.b} c:${rc.c} d:${rc.d}`;
+
+            // Sende Zustand zum Server
+            socket.emit('rc', rc);
+        }
+
+        // Event Listeners für Buttons
+        document.getElementById('btn-takeoff').addEventListener('click', () => socket.emit('command', 'takeoff'));
+        document.getElementById('btn-land').addEventListener('click', () => socket.emit('command', 'land'));
+        document.getElementById('btn-stop').addEventListener('click', () => {
+            activeKeys.clear();
+            updateRC();
+            socket.emit('command', 'stop');
+        });
+
+        // Event Listeners für Tastatur (Keydown / Keyup)
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return; // Ignoriere das OS Auto-Repeat!
+
+            const keyStr = normalizeKey(e);
+
+            // Optisches Feedback
+            const kbd = document.getElementById(`key-${keyStr}`);
+            if (kbd) kbd.classList.add('key-active');
+
+            if (commandMap[keyStr]) {
+                e.preventDefault(); // Verhindere Scrollen
+                const cmd = commandMap[keyStr];
+                if (cmd === 'stop') {
+                    activeKeys.clear();
+                    updateRC();
+                }
+                socket.emit('command', cmd);
+                return;
+            }
+
+            if (keyMap[keyStr]) {
+                e.preventDefault(); // Verhindere Scrollen bei Pfeiltasten
+                activeKeys.add(keyStr);
+                updateRC();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const keyStr = normalizeKey(e);
+
+            // Optisches Feedback
+            const kbd = document.getElementById(`key-${keyStr}`);
+            if (kbd) kbd.classList.remove('key-active');
+
+            if (keyMap[keyStr]) {
+                activeKeys.delete(keyStr);
+                updateRC();
+            }
+        });
+
+    </script>
+</body>
+
+</html>

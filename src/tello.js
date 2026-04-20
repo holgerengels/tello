@@ -33,16 +33,24 @@ class Tello {
     send(command) {
         return new Promise((resolve, reject) => {
             const message = Buffer.from(command);
+            const isRc = command.startsWith('rc ');
 
-            // Setze den pendingCommand auf, um auf die Antwort auf Port 8889 zu warten
-            this.pendingCommand = {
-                resolve: resolve,
-                timeout: setTimeout(() => {
-                    console.log(`[Warnung] Zeitüberschreitung beim Warten auf eine Antwort für: ${command}`);
-                    this.pendingCommand = null;
-                    resolve('timeout');
-                }, 15000) // Max 15 Sekunden auf eine Antwort (z.B. bei start/landen) warten
-            };
+            if (!isRc) {
+                // Alte Timeouts aufräumen
+                if (this.pendingCommand && this.pendingCommand.timeout) {
+                    clearTimeout(this.pendingCommand.timeout);
+                }
+
+                // Setze den pendingCommand auf, um auf die Antwort auf Port 8889 zu warten
+                this.pendingCommand = {
+                    resolve: resolve,
+                    timeout: setTimeout(() => {
+                        console.log(`[Warnung] Zeitüberschreitung beim Warten auf eine Antwort für: ${command}`);
+                        this.pendingCommand = null;
+                        resolve('timeout');
+                    }, 15000) // Max 15 Sekunden auf eine Antwort (z.B. bei start/landen) warten
+                };
+            }
 
             this.client.send(message, 0, message.length, this.PORT, this.HOST, (err) => {
                 if (err) {
@@ -52,7 +60,11 @@ class Tello {
                     this.pendingCommand = null;
                     reject(err);
                 } else {
-                    console.log(`[Sende] -> ${command}`);
+                    if (!isRc) {
+                        console.log(`[Sende] -> ${command}`);
+                    } else {
+                        resolve('ok');
+                    }
                 }
             });
         });
@@ -61,6 +73,8 @@ class Tello {
     async init() {
         // SDK Modus aktivieren
         await this.send('command');
+        // Video-Stream aktivieren
+        await this.send('streamon');
     }
 
     close() {
